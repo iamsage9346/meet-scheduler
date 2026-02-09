@@ -1,0 +1,34 @@
+export type RoomType = 'availability' | 'booking';
+
+export interface Room {
+  id: string;
+  title: string;
+  type: RoomType;
+  dates: string[];
+  timeStart: number;
+  timeEnd: number;
+  hostSlots: string[] | null;
+  createdAt: Date;
+}
+
+export interface Participant {
+  id: string;
+  roomId: string;
+  name: string;
+  email?: string | null;
+  availableSlots: string[];
+  createdAt: Date;
+}
+
+export interface TimeSlot {
+  date: string;
+  time: string;
+  datetime: string;
+}
+
+export interface LocalRoom {
+  id: string;
+  title: string;
+  type: RoomType;
+  createdAt: string;
+}

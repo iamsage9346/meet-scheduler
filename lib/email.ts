@@ -1,6 +1,16 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend | null = null;
+
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    return null;
+  }
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 interface BookingConfirmationParams {
   to: string;
@@ -19,7 +29,8 @@ export async function sendBookingConfirmation({
   dateTime,
   meetLink,
 }: BookingConfirmationParams) {
-  if (!process.env.RESEND_API_KEY) {
+  const resendClient = getResend();
+  if (!resendClient) {
     console.log('RESEND_API_KEY not set, skipping email');
     return null;
   }
@@ -33,7 +44,7 @@ export async function sendBookingConfirmation({
     : '';
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendClient.emails.send({
       from: 'Meet Scheduler <onboarding@resend.dev>',
       to: [to],
       subject: `Booking Confirmed: ${eventTitle}`,
@@ -106,13 +117,14 @@ export async function sendBookingNotificationToHost({
   eventTitle,
   dateTime,
 }: BookingNotificationParams) {
-  if (!process.env.RESEND_API_KEY) {
+  const resendClient = getResend();
+  if (!resendClient) {
     console.log('RESEND_API_KEY not set, skipping email');
     return null;
   }
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendClient.emails.send({
       from: 'Meet Scheduler <onboarding@resend.dev>',
       to: [to],
       subject: `New Booking: ${guestName} - ${eventTitle}`,

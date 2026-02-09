@@ -7,7 +7,7 @@ import { useLocalRooms } from '@/hooks/useLocalRooms';
 import { useLocalBookings, type LocalBooking } from '@/hooks/useLocalBookings';
 import { cn } from '@/lib/utils';
 
-function BookingCard({ booking, onRemove }: { booking: LocalBooking; onRemove: (id: string) => void }) {
+function BookingCard({ booking, onRemove, isLoading }: { booking: LocalBooking; onRemove: (id: string) => void; isLoading: boolean }) {
   const date = booking.slot.split('T')[0];
   const time = booking.slot.split('T')[1];
   const [hours, minutes] = time.split(':').map(Number);
@@ -42,9 +42,10 @@ function BookingCard({ booking, onRemove }: { booking: LocalBooking; onRemove: (
         </Link>
         <button
           onClick={() => onRemove(booking.id)}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+          disabled={isLoading}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
         >
-          Remove
+          {isLoading ? 'Canceling...' : 'Cancel'}
         </button>
       </div>
     </div>
@@ -53,7 +54,7 @@ function BookingCard({ booking, onRemove }: { booking: LocalBooking; onRemove: (
 
 export default function MyRoomsPage() {
   const { rooms, removeRoom } = useLocalRooms();
-  const { bookings, removeBooking } = useLocalBookings();
+  const { bookings, removeBooking, isLoading } = useLocalBookings();
   const [activeTab, setActiveTab] = useState<'rooms' | 'bookings'>('rooms');
 
   const hasRooms = rooms.length > 0;
@@ -130,7 +131,7 @@ export default function MyRoomsPage() {
       ) : (
         <div className="space-y-3">
           {bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} onRemove={removeBooking} />
+            <BookingCard key={booking.id} booking={booking} onRemove={removeBooking} isLoading={isLoading} />
           ))}
         </div>
       )}

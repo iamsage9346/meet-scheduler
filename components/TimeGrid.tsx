@@ -22,6 +22,8 @@ export default function TimeGrid({
 }: TimeGridProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'select' | 'deselect'>('select');
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [isTouchScrolling, setIsTouchScrolling] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const hours = Array.from(
@@ -29,9 +31,16 @@ export default function TimeGrid({
     (_, i) => timeStart + i
   );
 
+  // Check if a slot is in the past
+  const isSlotInPast = useCallback((datetime: string) => {
+    const now = new Date();
+    const slotDate = new Date(datetime.replace('T', ' ') + ':00');
+    return slotDate < now;
+  }, []);
+
   const handleSlotInteraction = useCallback(
     (datetime: string, isStart: boolean) => {
-      if (readOnly) return;
+      if (readOnly || isSlotInPast(datetime)) return;
 
       if (isStart) {
         setIsDragging(true);
@@ -43,7 +52,7 @@ export default function TimeGrid({
         } else {
           onSlotsChange([...selectedSlots, datetime]);
         }
-      } else if (isDragging) {
+      } else if (isDragging && !isTouchScrolling) {
         if (dragMode === 'select' && !selectedSlots.includes(datetime)) {
           onSlotsChange([...selectedSlots, datetime]);
         } else if (dragMode === 'deselect' && selectedSlots.includes(datetime)) {
@@ -51,11 +60,54 @@ export default function TimeGrid({
         }
       }
     },
-    [isDragging, dragMode, selectedSlots, onSlotsChange, readOnly]
+    [isDragging, dragMode, selectedSlots, onSlotsChange, readOnly, isSlotInPast, isTouchScrolling]
   );
 
+  // Handle touch start - record position to detect scrolling
+  const handleTouchStart = useCallback((e: React.TouchEvent, datetime: string) => {
+    if (readOnly || isSlotInPast(datetime)) return;
+
+    const touch = e.touches[0];
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY });
+    setIsTouchScrolling(false);
+  }, [readOnly, isSlotInPast]);
+
+  // Handle touch move - detect if scrolling
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartPos) return;
+
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+    const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+
+    // If moved more than 10px, consider it scrolling
+    if (deltaX > 10 || deltaY > 10) {
+      setIsTouchScrolling(true);
+      setIsDragging(false);
+    }
+  }, [touchStartPos]);
+
+  // Handle touch end - only select if not scrolling
+  const handleTouchEnd = useCallback((datetime: string) => {
+    if (!isTouchScrolling && touchStartPos && !readOnly && !isSlotInPast(datetime)) {
+      const isCurrentlySelected = selectedSlots.includes(datetime);
+      if (isCurrentlySelected) {
+        onSlotsChange(selectedSlots.filter((s) => s !== datetime));
+      } else {
+        onSlotsChange([...selectedSlots, datetime]);
+      }
+    }
+    setTouchStartPos(null);
+    setIsTouchScrolling(false);
+    setIsDragging(false);
+  }, [isTouchScrolling, touchStartPos, selectedSlots, onSlotsChange, readOnly, isSlotInPast]);
+
   useEffect(() => {
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setTouchStartPos(null);
+      setIsTouchScrolling(false);
+    };
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('touchend', handleMouseUp);
     return () => {
@@ -95,25 +147,24 @@ export default function TimeGrid({
               {dates.map((date) => {
                 const datetime = `${date}T${hour.toString().padStart(2, '0')}:00`;
                 const isSelected = selectedSlots.includes(datetime);
+                const isPast = isSlotInPast(datetime);
                 return (
                   <div
                     key={datetime}
                     className={cn(
-                      'h-6 w-20 shrink-0 cursor-pointer border-l border-t border-zinc-200 transition-colors dark:border-zinc-700',
-                      isSelected
-                        ? 'bg-emerald-400 dark:bg-emerald-500'
-                        : 'bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
+                      'h-6 w-20 shrink-0 border-l border-t border-zinc-200 transition-colors dark:border-zinc-700',
+                      isPast
+                        ? 'cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50'
+                        : isSelected
+                          ? 'cursor-pointer bg-emerald-400 dark:bg-emerald-500'
+                          : 'cursor-pointer bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
                       readOnly && 'cursor-default'
                     )}
-                    onMouseDown={() => handleSlotInteraction(datetime, true)}
-                    onMouseEnter={() => handleSlotInteraction(datetime, false)}
-                    onTouchStart={() => handleSlotInteraction(datetime, true)}
-                    onTouchMove={(e) => {
-                      const touch = e.touches[0];
-                      const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                      const dt = element?.getAttribute('data-datetime');
-                      if (dt) handleSlotInteraction(dt, false);
-                    }}
+                    onMouseDown={() => !isPast && handleSlotInteraction(datetime, true)}
+                    onMouseEnter={() => !isPast && handleSlotInteraction(datetime, false)}
+                    onTouchStart={(e) => handleTouchStart(e, datetime)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={() => handleTouchEnd(datetime)}
                     data-datetime={datetime}
                   />
                 );
@@ -125,25 +176,24 @@ export default function TimeGrid({
               {dates.map((date) => {
                 const datetime = `${date}T${hour.toString().padStart(2, '0')}:30`;
                 const isSelected = selectedSlots.includes(datetime);
+                const isPast = isSlotInPast(datetime);
                 return (
                   <div
                     key={datetime}
                     className={cn(
-                      'h-6 w-20 shrink-0 cursor-pointer border-l border-zinc-200 transition-colors dark:border-zinc-700',
-                      isSelected
-                        ? 'bg-emerald-400 dark:bg-emerald-500'
-                        : 'bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
+                      'h-6 w-20 shrink-0 border-l border-zinc-200 transition-colors dark:border-zinc-700',
+                      isPast
+                        ? 'cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50'
+                        : isSelected
+                          ? 'cursor-pointer bg-emerald-400 dark:bg-emerald-500'
+                          : 'cursor-pointer bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
                       readOnly && 'cursor-default'
                     )}
-                    onMouseDown={() => handleSlotInteraction(datetime, true)}
-                    onMouseEnter={() => handleSlotInteraction(datetime, false)}
-                    onTouchStart={() => handleSlotInteraction(datetime, true)}
-                    onTouchMove={(e) => {
-                      const touch = e.touches[0];
-                      const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                      const dt = element?.getAttribute('data-datetime');
-                      if (dt) handleSlotInteraction(dt, false);
-                    }}
+                    onMouseDown={() => !isPast && handleSlotInteraction(datetime, true)}
+                    onMouseEnter={() => !isPast && handleSlotInteraction(datetime, false)}
+                    onTouchStart={(e) => handleTouchStart(e, datetime)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={() => handleTouchEnd(datetime)}
                     data-datetime={datetime}
                   />
                 );

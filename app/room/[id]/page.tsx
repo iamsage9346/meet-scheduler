@@ -338,6 +338,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 dates={room.dates}
                 timeStart={room.timeStart}
                 timeEnd={room.timeEnd}
+                timeRanges={room.timeRanges}
                 selectedSlots={selectedSlots}
                 onSlotsChange={setSelectedSlots}
               />
@@ -417,6 +418,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           dates={room.dates}
           timeStart={room.timeStart}
           timeEnd={room.timeEnd}
+          timeRanges={room.timeRanges}
           participants={room.participants}
         />
       )}

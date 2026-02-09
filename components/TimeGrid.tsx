@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { cn, formatTime, formatDate } from '@/lib/utils';
 
 interface TimeGridProps {
   dates: string[];
   timeStart: number;
   timeEnd: number;
+  timeRanges?: Record<string, [number, number]> | null;
   selectedSlots: string[];
   onSlotsChange: (slots: string[]) => void;
   readOnly?: boolean;
@@ -16,6 +17,7 @@ export default function TimeGrid({
   dates,
   timeStart,
   timeEnd,
+  timeRanges,
   selectedSlots,
   onSlotsChange,
   readOnly = false,
@@ -26,9 +28,44 @@ export default function TimeGrid({
   const [isTouchScrolling, setIsTouchScrolling] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Calculate global min/max time range across all dates
+  const { globalStart, globalEnd } = useMemo(() => {
+    if (!timeRanges || Object.keys(timeRanges).length === 0) {
+      return { globalStart: timeStart, globalEnd: timeEnd };
+    }
+    let minStart = timeStart;
+    let maxEnd = timeEnd;
+    dates.forEach((date) => {
+      const range = timeRanges[date] || [timeStart, timeEnd];
+      minStart = Math.min(minStart, range[0]);
+      maxEnd = Math.max(maxEnd, range[1]);
+    });
+    return { globalStart: minStart, globalEnd: maxEnd };
+  }, [dates, timeStart, timeEnd, timeRanges]);
+
+  // Get time range for a specific date
+  const getTimeRange = useCallback(
+    (date: string): [number, number] => {
+      if (timeRanges && timeRanges[date]) {
+        return timeRanges[date];
+      }
+      return [timeStart, timeEnd];
+    },
+    [timeRanges, timeStart, timeEnd]
+  );
+
+  // Check if a specific hour is within the date's time range
+  const isHourInRange = useCallback(
+    (date: string, hour: number): boolean => {
+      const [start, end] = getTimeRange(date);
+      return hour >= start && hour < end;
+    },
+    [getTimeRange]
+  );
+
   const hours = Array.from(
-    { length: timeEnd - timeStart },
-    (_, i) => timeStart + i
+    { length: globalEnd - globalStart },
+    (_, i) => globalStart + i
   );
 
   // Check if a slot is in the past
@@ -148,23 +185,27 @@ export default function TimeGrid({
                 const datetime = `${date}T${hour.toString().padStart(2, '0')}:00`;
                 const isSelected = selectedSlots.includes(datetime);
                 const isPast = isSlotInPast(datetime);
+                const inRange = isHourInRange(date, hour);
+                const isDisabled = !inRange || isPast;
                 return (
                   <div
                     key={datetime}
                     className={cn(
                       'h-6 w-20 shrink-0 border-l border-t border-zinc-200 transition-colors dark:border-zinc-700',
-                      isPast
-                        ? 'cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50'
-                        : isSelected
-                          ? 'cursor-pointer bg-emerald-400 dark:bg-emerald-500'
-                          : 'cursor-pointer bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
+                      !inRange
+                        ? 'bg-zinc-200/50 dark:bg-zinc-800/30'
+                        : isPast
+                          ? 'cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50'
+                          : isSelected
+                            ? 'cursor-pointer bg-emerald-400 dark:bg-emerald-500'
+                            : 'cursor-pointer bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
                       readOnly && 'cursor-default'
                     )}
-                    onMouseDown={() => !isPast && handleSlotInteraction(datetime, true)}
-                    onMouseEnter={() => !isPast && handleSlotInteraction(datetime, false)}
-                    onTouchStart={(e) => handleTouchStart(e, datetime)}
+                    onMouseDown={() => !isDisabled && handleSlotInteraction(datetime, true)}
+                    onMouseEnter={() => !isDisabled && handleSlotInteraction(datetime, false)}
+                    onTouchStart={(e) => !isDisabled && handleTouchStart(e, datetime)}
                     onTouchMove={handleTouchMove}
-                    onTouchEnd={() => handleTouchEnd(datetime)}
+                    onTouchEnd={() => !isDisabled && handleTouchEnd(datetime)}
                     data-datetime={datetime}
                   />
                 );
@@ -177,23 +218,27 @@ export default function TimeGrid({
                 const datetime = `${date}T${hour.toString().padStart(2, '0')}:30`;
                 const isSelected = selectedSlots.includes(datetime);
                 const isPast = isSlotInPast(datetime);
+                const inRange = isHourInRange(date, hour);
+                const isDisabled = !inRange || isPast;
                 return (
                   <div
                     key={datetime}
                     className={cn(
                       'h-6 w-20 shrink-0 border-l border-zinc-200 transition-colors dark:border-zinc-700',
-                      isPast
-                        ? 'cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50'
-                        : isSelected
-                          ? 'cursor-pointer bg-emerald-400 dark:bg-emerald-500'
-                          : 'cursor-pointer bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
+                      !inRange
+                        ? 'bg-zinc-200/50 dark:bg-zinc-800/30'
+                        : isPast
+                          ? 'cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50'
+                          : isSelected
+                            ? 'cursor-pointer bg-emerald-400 dark:bg-emerald-500'
+                            : 'cursor-pointer bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800',
                       readOnly && 'cursor-default'
                     )}
-                    onMouseDown={() => !isPast && handleSlotInteraction(datetime, true)}
-                    onMouseEnter={() => !isPast && handleSlotInteraction(datetime, false)}
-                    onTouchStart={(e) => handleTouchStart(e, datetime)}
+                    onMouseDown={() => !isDisabled && handleSlotInteraction(datetime, true)}
+                    onMouseEnter={() => !isDisabled && handleSlotInteraction(datetime, false)}
+                    onTouchStart={(e) => !isDisabled && handleTouchStart(e, datetime)}
                     onTouchMove={handleTouchMove}
-                    onTouchEnd={() => handleTouchEnd(datetime)}
+                    onTouchEnd={() => !isDisabled && handleTouchEnd(datetime)}
                     data-datetime={datetime}
                   />
                 );
@@ -204,7 +249,7 @@ export default function TimeGrid({
         {/* Bottom border */}
         <div className="flex">
           <div className="flex w-16 shrink-0 items-center justify-end pr-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {formatTime(timeEnd)}
+            {formatTime(globalEnd)}
           </div>
           {dates.map((date) => (
             <div

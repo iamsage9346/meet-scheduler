@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import DatePicker from '@/components/DatePicker';
 import TimeGrid from '@/components/TimeGrid';
 import { useLocalRooms } from '@/hooks/useLocalRooms';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import type { RoomType } from '@/types';
 
 export default function Home() {
@@ -17,6 +17,7 @@ export default function Home() {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [timeStart, setTimeStart] = useState(9);
   const [timeEnd, setTimeEnd] = useState(17);
+  const [timeRanges, setTimeRanges] = useState<Record<string, [number, number]>>({});
   const [hostSlots, setHostSlots] = useState<string[]>([]);
 
   // Host info for booking type
@@ -41,8 +42,13 @@ export default function Home() {
       return;
     }
 
-    if (timeStart >= timeEnd) {
-      setError('End time must be after start time');
+    // Validate time ranges
+    const hasInvalidTimeRange = selectedDates.some((date) => {
+      const range = timeRanges[date] || [timeStart, timeEnd];
+      return range[0] >= range[1];
+    });
+    if (hasInvalidTimeRange) {
+      setError('End time must be after start time for all dates');
       return;
     }
 
@@ -59,6 +65,12 @@ export default function Home() {
     setIsLoading(true);
 
     try {
+      // Build time ranges for all dates
+      const finalTimeRanges: Record<string, [number, number]> = {};
+      selectedDates.forEach((date) => {
+        finalTimeRanges[date] = timeRanges[date] || [timeStart, timeEnd];
+      });
+
       const response = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,6 +80,7 @@ export default function Home() {
           dates: selectedDates,
           timeStart,
           timeEnd,
+          timeRanges: roomType === 'availability' ? finalTimeRanges : null,
           hostSlots: roomType === 'booking' ? hostSlots : null,
           hostName: roomType === 'booking' ? hostName.trim() : null,
           hostEmail: roomType === 'booking' && hostEmail.trim() ? hostEmail.trim() : null,
@@ -112,7 +125,22 @@ export default function Home() {
       <div className="mb-8 flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
         <button
           type="button"
-          onClick={() => setRoomType('availability')}
+          onClick={() => {
+            if (roomType !== 'availability') {
+              setRoomType('availability');
+              // Reset all form state when switching tabs
+              setTitle('');
+              setSelectedDates([]);
+              setTimeStart(9);
+              setTimeEnd(17);
+              setTimeRanges({});
+              setHostSlots([]);
+              setHostName('');
+              setHostEmail('');
+              setMeetLink('');
+              setError('');
+            }
+          }}
           className={cn(
             'flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
             roomType === 'availability'
@@ -127,7 +155,22 @@ export default function Home() {
         </button>
         <button
           type="button"
-          onClick={() => setRoomType('booking')}
+          onClick={() => {
+            if (roomType !== 'booking') {
+              setRoomType('booking');
+              // Reset all form state when switching tabs
+              setTitle('');
+              setSelectedDates([]);
+              setTimeStart(9);
+              setTimeEnd(17);
+              setTimeRanges({});
+              setHostSlots([]);
+              setHostName('');
+              setHostEmail('');
+              setMeetLink('');
+              setError('');
+            }
+          }}
           className={cn(
             'flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
             roomType === 'booking'
@@ -238,14 +281,24 @@ export default function Home() {
               if (roomType === 'booking') {
                 setHostSlots([]);
               }
+              // Clean up time ranges for removed dates
+              setTimeRanges((prev) => {
+                const updated: Record<string, [number, number]> = {};
+                dates.forEach((date) => {
+                  if (prev[date]) {
+                    updated[date] = prev[date];
+                  }
+                });
+                return updated;
+              });
             }}
           />
         </div>
 
-        {/* Time Range */}
+        {/* Default Time Range */}
         <div>
           <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Time range
+            {roomType === 'availability' ? 'Default time range' : 'Time range'}
           </label>
           <div className="flex items-center gap-4">
             <select
@@ -279,6 +332,83 @@ export default function Home() {
             </select>
           </div>
         </div>
+
+        {/* Per-date Time Ranges (for availability type) */}
+        {roomType === 'availability' && selectedDates.length > 0 && (
+          <div>
+            <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Adjust time per date (optional)
+            </label>
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              Customize time ranges for specific dates if needed
+            </p>
+            <div className="space-y-2">
+              {selectedDates.map((date) => {
+                const range = timeRanges[date] || [timeStart, timeEnd];
+                return (
+                  <div
+                    key={date}
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
+                  >
+                    <span className="min-w-[100px] text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {formatDate(date)}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={range[0]}
+                        onChange={(e) => {
+                          setTimeRanges((prev) => ({
+                            ...prev,
+                            [date]: [Number(e.target.value), range[1]],
+                          }));
+                        }}
+                        className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        {timeOptions.map((hour) => (
+                          <option key={hour} value={hour}>
+                            {hour === 0 ? '12AM' : hour < 12 ? `${hour}AM` : hour === 12 ? '12PM' : `${hour - 12}PM`}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-zinc-500">-</span>
+                      <select
+                        value={range[1]}
+                        onChange={(e) => {
+                          setTimeRanges((prev) => ({
+                            ...prev,
+                            [date]: [range[0], Number(e.target.value)],
+                          }));
+                        }}
+                        className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        {timeOptions.map((hour) => (
+                          <option key={hour} value={hour}>
+                            {hour === 0 ? '12AM' : hour < 12 ? `${hour}AM` : hour === 12 ? '12PM' : `${hour - 12}PM`}
+                          </option>
+                        ))}
+                      </select>
+                      {timeRanges[date] && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTimeRanges((prev) => {
+                              const updated = { ...prev };
+                              delete updated[date];
+                              return updated;
+                            });
+                          }}
+                          className="ml-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Host Slots Selection (for booking type) */}
         {roomType === 'booking' && selectedDates.length > 0 && timeStart < timeEnd && (

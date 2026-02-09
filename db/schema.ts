@@ -7,6 +7,7 @@ export const rooms = pgTable('rooms', {
   dates: text('dates').array().notNull(),
   timeStart: integer('time_start').notNull(),
   timeEnd: integer('time_end').notNull(),
+  timeRanges: jsonb('time_ranges').$type<Record<string, [number, number]>>(), // Per-date time ranges: { "2026-02-09": [9, 17] }
   hostSlots: jsonb('host_slots').$type<string[]>(), // For booking type: available slots set by host
   hostName: text('host_name'), // Host's display name
   hostEmail: text('host_email'), // Host's email for notifications

@@ -8,6 +8,7 @@ interface HeatMapProps {
   dates: string[];
   timeStart: number;
   timeEnd: number;
+  timeRanges?: Record<string, [number, number]> | null;
   participants: Participant[];
 }
 
@@ -15,14 +16,51 @@ export default function HeatMap({
   dates,
   timeStart,
   timeEnd,
+  timeRanges,
   participants,
 }: HeatMapProps) {
+  // Calculate global min/max time range across all dates
+  const { globalStart, globalEnd } = useMemo(() => {
+    if (!timeRanges || Object.keys(timeRanges).length === 0) {
+      return { globalStart: timeStart, globalEnd: timeEnd };
+    }
+    let minStart = timeStart;
+    let maxEnd = timeEnd;
+    dates.forEach((date) => {
+      const range = timeRanges[date] || [timeStart, timeEnd];
+      minStart = Math.min(minStart, range[0]);
+      maxEnd = Math.max(maxEnd, range[1]);
+    });
+    return { globalStart: minStart, globalEnd: maxEnd };
+  }, [dates, timeStart, timeEnd, timeRanges]);
+
+  // Get time range for a specific date
+  const getTimeRange = (date: string): [number, number] => {
+    if (timeRanges && timeRanges[date]) {
+      return timeRanges[date];
+    }
+    return [timeStart, timeEnd];
+  };
+
+  // Check if a specific hour is within the date's time range
+  const isHourInRange = (date: string, hour: number): boolean => {
+    const [start, end] = getTimeRange(date);
+    return hour >= start && hour < end;
+  };
+
   const { slotCounts, maxCount } = useMemo(() => {
     const counts: Record<string, number> = {};
     let max = 0;
 
-    generateTimeSlots(dates, timeStart, timeEnd).forEach((slot) => {
-      counts[slot.datetime] = 0;
+    // Generate slots for each date based on its time range
+    dates.forEach((date) => {
+      const [start, end] = timeRanges?.[date] || [timeStart, timeEnd];
+      for (let hour = start; hour < end; hour++) {
+        for (const minute of [0, 30]) {
+          const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          counts[`${date}T${timeStr}`] = 0;
+        }
+      }
     });
 
     participants.forEach((p) => {
@@ -35,7 +73,7 @@ export default function HeatMap({
     });
 
     return { slotCounts: counts, maxCount: max };
-  }, [dates, timeStart, timeEnd, participants]);
+  }, [dates, timeStart, timeEnd, timeRanges, participants]);
 
   const getHeatColor = (count: number) => {
     if (count === 0 || maxCount === 0) {
@@ -49,8 +87,8 @@ export default function HeatMap({
   };
 
   const hours = Array.from(
-    { length: timeEnd - timeStart },
-    (_, i) => timeStart + i
+    { length: globalEnd - globalStart },
+    (_, i) => globalStart + i
   );
 
   if (participants.length === 0) {
@@ -92,13 +130,14 @@ export default function HeatMap({
                 {dates.map((date) => {
                   const datetime = `${date}T${hour.toString().padStart(2, '0')}:00`;
                   const count = slotCounts[datetime] || 0;
+                  const inRange = isHourInRange(date, hour);
                   return (
                     <div
                       key={datetime}
-                      className={`relative h-6 w-20 shrink-0 border-l border-t border-zinc-200 transition-colors dark:border-zinc-700 ${getHeatColor(count)}`}
-                      title={`${count} / ${participants.length} available`}
+                      className={`relative h-6 w-20 shrink-0 border-l border-t border-zinc-200 transition-colors dark:border-zinc-700 ${inRange ? getHeatColor(count) : 'bg-zinc-200/50 dark:bg-zinc-800/30'}`}
+                      title={inRange ? `${count} / ${participants.length} available` : 'Not available'}
                     >
-                      {count > 0 && (
+                      {inRange && count > 0 && (
                         <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-zinc-700 dark:text-zinc-200">
                           {count}
                         </span>
@@ -113,13 +152,14 @@ export default function HeatMap({
                 {dates.map((date) => {
                   const datetime = `${date}T${hour.toString().padStart(2, '0')}:30`;
                   const count = slotCounts[datetime] || 0;
+                  const inRange = isHourInRange(date, hour);
                   return (
                     <div
                       key={datetime}
-                      className={`relative h-6 w-20 shrink-0 border-l border-zinc-200 transition-colors dark:border-zinc-700 ${getHeatColor(count)}`}
-                      title={`${count} / ${participants.length} available`}
+                      className={`relative h-6 w-20 shrink-0 border-l border-zinc-200 transition-colors dark:border-zinc-700 ${inRange ? getHeatColor(count) : 'bg-zinc-200/50 dark:bg-zinc-800/30'}`}
+                      title={inRange ? `${count} / ${participants.length} available` : 'Not available'}
                     >
-                      {count > 0 && (
+                      {inRange && count > 0 && (
                         <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-zinc-700 dark:text-zinc-200">
                           {count}
                         </span>
@@ -133,7 +173,7 @@ export default function HeatMap({
           {/* Bottom border */}
           <div className="flex">
             <div className="flex w-16 shrink-0 items-center justify-end pr-2 text-xs text-zinc-500 dark:text-zinc-400">
-              {formatTime(timeEnd)}
+              {formatTime(globalEnd)}
             </div>
             {dates.map((date) => (
               <div

@@ -7,6 +7,7 @@ export interface Room {
   dates: string[];
   timeStart: number;
   timeEnd: number;
+  timeRanges: Record<string, [number, number]> | null; // Per-date time ranges
   hostSlots: string[] | null;
   hostName: string | null;
   hostEmail: string | null;

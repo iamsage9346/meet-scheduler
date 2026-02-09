@@ -45,7 +45,7 @@ export async function sendBookingConfirmation({
 
   try {
     const { data, error } = await resendClient.emails.send({
-      from: 'Meet Scheduler <noreply@meet-scheduler.xyz>',
+      from: 'Meet Scheduler <noreply@meet-schedular.xyz>',
       to: [to],
       subject: `Booking Confirmed: ${eventTitle}`,
       html: `
@@ -125,7 +125,7 @@ export async function sendBookingNotificationToHost({
 
   try {
     const { data, error } = await resendClient.emails.send({
-      from: 'Meet Scheduler <noreply@meet-scheduler.xyz>',
+      from: 'Meet Scheduler <noreply@meet-schedular.xyz>',
       to: [to],
       subject: `New Booking: ${guestName} - ${eventTitle}`,
       html: `

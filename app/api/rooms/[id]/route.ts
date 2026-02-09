@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { rooms, participants } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -9,6 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const db = getDb();
 
     const [room] = await db
       .select()

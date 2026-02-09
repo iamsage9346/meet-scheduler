@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { participants } from '@/db/schema';
 
 export async function POST(
@@ -18,6 +18,7 @@ export async function POST(
       );
     }
 
+    const db = getDb();
     const [participant] = await db
       .insert(participants)
       .values({

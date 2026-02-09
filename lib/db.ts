@@ -1,29 +1,27 @@
 import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle, NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import * as schema from '@/db/schema';
 
-function getDb() {
-  const connectionString = process.env.DATABASE_URL;
+type DbType = NeonHttpDatabase<typeof schema>;
 
-  if (!connectionString) {
-    throw new Error(
-      'DATABASE_URL environment variable is not set. ' +
-      'Please set it in your .env.local file or Vercel environment variables.'
-    );
+let db: DbType;
+
+export function getDb(): DbType {
+  if (!db) {
+    const connectionString = process.env.DATABASE_URL;
+
+    if (!connectionString) {
+      throw new Error(
+        'DATABASE_URL environment variable is not set. ' +
+        'Please set it in your .env.local file or Vercel environment variables.'
+      );
+    }
+
+    const sql = neon(connectionString);
+    db = drizzle(sql, { schema });
   }
 
-  const sql = neon(connectionString);
-  return drizzle(sql, { schema });
+  return db;
 }
 
-// Lazy initialization - only create connection when needed
-let _db: ReturnType<typeof getDb> | null = null;
-
-export const db = new Proxy({} as ReturnType<typeof getDb>, {
-  get(_, prop) {
-    if (!_db) {
-      _db = getDb();
-    }
-    return (_db as Record<string | symbol, unknown>)[prop];
-  },
-});
+export { db };

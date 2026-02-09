@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { rooms } from '@/db/schema';
 
 export async function POST(request: Request) {
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
       );
     }
 
+    const db = getDb();
     const [room] = await db
       .insert(rooms)
       .values({

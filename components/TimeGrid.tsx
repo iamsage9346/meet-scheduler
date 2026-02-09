@@ -100,44 +100,51 @@ export default function TimeGrid({
     [isDragging, dragMode, selectedSlots, onSlotsChange, readOnly, isSlotInPast, isTouchScrolling]
   );
 
-  // Handle touch start - record position to detect scrolling
+  // Handle touch start - start drag selection
   const handleTouchStart = useCallback((e: React.TouchEvent, datetime: string) => {
     if (readOnly || isSlotInPast(datetime)) return;
 
+    e.preventDefault(); // Prevent scrolling when touching grid
     const touch = e.touches[0];
     setTouchStartPos({ x: touch.clientX, y: touch.clientY });
     setIsTouchScrolling(false);
-  }, [readOnly, isSlotInPast]);
+    setIsDragging(true);
 
-  // Handle touch move - detect if scrolling
+    const isCurrentlySelected = selectedSlots.includes(datetime);
+    setDragMode(isCurrentlySelected ? 'deselect' : 'select');
+
+    if (isCurrentlySelected) {
+      onSlotsChange(selectedSlots.filter((s) => s !== datetime));
+    } else {
+      onSlotsChange([...selectedSlots, datetime]);
+    }
+  }, [readOnly, isSlotInPast, selectedSlots, onSlotsChange]);
+
+  // Handle touch move - select cells under finger
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartPos) return;
+    if (!isDragging || !touchStartPos) return;
 
     const touch = e.touches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartPos.x);
-    const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+    const element = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement;
 
-    // If moved more than 10px, consider it scrolling
-    if (deltaX > 10 || deltaY > 10) {
-      setIsTouchScrolling(true);
-      setIsDragging(false);
-    }
-  }, [touchStartPos]);
-
-  // Handle touch end - only select if not scrolling
-  const handleTouchEnd = useCallback((datetime: string) => {
-    if (!isTouchScrolling && touchStartPos && !readOnly && !isSlotInPast(datetime)) {
-      const isCurrentlySelected = selectedSlots.includes(datetime);
-      if (isCurrentlySelected) {
-        onSlotsChange(selectedSlots.filter((s) => s !== datetime));
-      } else {
-        onSlotsChange([...selectedSlots, datetime]);
+    if (element && element.dataset.datetime) {
+      const datetime = element.dataset.datetime;
+      if (!isSlotInPast(datetime)) {
+        if (dragMode === 'select' && !selectedSlots.includes(datetime)) {
+          onSlotsChange([...selectedSlots, datetime]);
+        } else if (dragMode === 'deselect' && selectedSlots.includes(datetime)) {
+          onSlotsChange(selectedSlots.filter((s) => s !== datetime));
+        }
       }
     }
+  }, [isDragging, touchStartPos, dragMode, selectedSlots, onSlotsChange, isSlotInPast]);
+
+  // Handle touch end
+  const handleTouchEnd = useCallback(() => {
     setTouchStartPos(null);
     setIsTouchScrolling(false);
     setIsDragging(false);
-  }, [isTouchScrolling, touchStartPos, selectedSlots, onSlotsChange, readOnly, isSlotInPast]);
+  }, []);
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -205,7 +212,7 @@ export default function TimeGrid({
                     onMouseEnter={() => !isDisabled && handleSlotInteraction(datetime, false)}
                     onTouchStart={(e) => !isDisabled && handleTouchStart(e, datetime)}
                     onTouchMove={handleTouchMove}
-                    onTouchEnd={() => !isDisabled && handleTouchEnd(datetime)}
+                    onTouchEnd={handleTouchEnd}
                     data-datetime={datetime}
                   />
                 );
@@ -238,7 +245,7 @@ export default function TimeGrid({
                     onMouseEnter={() => !isDisabled && handleSlotInteraction(datetime, false)}
                     onTouchStart={(e) => !isDisabled && handleTouchStart(e, datetime)}
                     onTouchMove={handleTouchMove}
-                    onTouchEnd={() => !isDisabled && handleTouchEnd(datetime)}
+                    onTouchEnd={handleTouchEnd}
                     data-datetime={datetime}
                   />
                 );

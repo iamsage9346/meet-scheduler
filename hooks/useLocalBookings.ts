@@ -39,7 +39,11 @@ export function useLocalBookings() {
   const removeBooking = useCallback(async (id: string) => {
     // Find the booking to get roomId
     const booking = getStoredBookings().find((b) => b.id === id);
-    if (!booking) return;
+    if (!booking) {
+      // Already removed from localStorage, just update state
+      setBookings((prev) => prev.filter((b) => b.id !== id));
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -48,7 +52,8 @@ export function useLocalBookings() {
         method: 'DELETE',
       });
 
-      if (!res.ok) {
+      // If 404, the booking was already deleted (e.g., by host) - still remove from localStorage
+      if (!res.ok && res.status !== 404) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to cancel booking');
       }

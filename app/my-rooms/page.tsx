@@ -7,7 +7,7 @@ import { useLocalRooms } from '@/hooks/useLocalRooms';
 import { useLocalBookings, type LocalBooking } from '@/hooks/useLocalBookings';
 import { cn } from '@/lib/utils';
 
-function BookingCard({ booking, onRemove, isLoading }: { booking: LocalBooking; onRemove: (id: string) => void; isLoading: boolean }) {
+function BookingCard({ booking }: { booking: LocalBooking }) {
   const date = booking.slot.split('T')[0];
   const time = booking.slot.split('T')[1];
   const [hours, minutes] = time.split(':').map(Number);
@@ -40,13 +40,12 @@ function BookingCard({ booking, onRemove, isLoading }: { booking: LocalBooking; 
         >
           View
         </Link>
-        <button
-          onClick={() => onRemove(booking.id)}
-          disabled={isLoading}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
+        <Link
+          href={`/room/${booking.roomId}`}
+          className="rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
         >
-          {isLoading ? 'Canceling...' : 'Cancel'}
-        </button>
+          Change Time
+        </Link>
       </div>
     </div>
   );
@@ -131,7 +130,7 @@ export default function MyRoomsPage() {
       ) : (
         <div className="space-y-3">
           {bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} onRemove={removeBooking} isLoading={isLoading} />
+            <BookingCard key={booking.id} booking={booking} />
           ))}
         </div>
       )}

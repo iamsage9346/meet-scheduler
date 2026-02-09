@@ -15,7 +15,7 @@ interface RoomData extends Room {
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { rooms: localRooms } = useLocalRooms();
-  const { addBooking } = useLocalBookings();
+  const { bookings: localBookings, addBooking, removeBooking } = useLocalBookings();
   const [room, setRoom] = useState<RoomData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,6 +34,20 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const isHost = useMemo(() => {
     return localRooms.some((r) => r.id === id);
   }, [localRooms, id]);
+
+  // Check if current user has an existing booking in this room
+  const myBooking = useMemo(() => {
+    return localBookings.find((b) => b.roomId === id);
+  }, [localBookings, id]);
+
+  // Cancel user's own booking
+  const handleCancelMyBooking = async () => {
+    if (!myBooking) return;
+    if (!confirm('Cancel your booking and select a new time?')) return;
+
+    await removeBooking(myBooking.id);
+    await fetchRoom();
+  };
 
   const fetchRoom = useCallback(async () => {
     try {
@@ -247,6 +261,39 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           </button>
         </div>
       ) : null}
+
+      {/* Guest's existing booking - show option to change time */}
+      {myBooking && !isHost && activeTab === 'respond' && !submitted && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-medium text-amber-800 dark:text-amber-300">
+                You have an existing booking
+              </h3>
+              <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+                {(() => {
+                  const date = myBooking.slot.split('T')[0];
+                  const time = myBooking.slot.split('T')[1];
+                  const [hours, minutes] = time.split(':').map(Number);
+                  const period = hours >= 12 ? 'PM' : 'AM';
+                  const displayHour = hours % 12 || 12;
+                  return `${new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                  })} at ${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
+                })()}
+              </p>
+            </div>
+            <button
+              onClick={handleCancelMyBooking}
+              className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+            >
+              Change Time
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {activeTab === 'respond' || !showResultsTab ? (

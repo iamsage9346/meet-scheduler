@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use, useMemo } from 'react';
+import { useState, useEffect, use, useMemo, useCallback } from 'react';
 import TimeGrid from '@/components/TimeGrid';
 import HeatMap from '@/components/HeatMap';
 import BookingSlots from '@/components/BookingSlots';
@@ -35,29 +35,54 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     return localRooms.some((r) => r.id === id);
   }, [localRooms, id]);
 
-  useEffect(() => {
-    const fetchRoom = async () => {
-      try {
-        const response = await fetch(`/api/rooms/${id}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError('Room not found');
-          } else {
-            throw new Error('Failed to fetch room');
-          }
-          return;
+  const fetchRoom = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/rooms/${id}`, {
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError('Room not found');
+        } else {
+          throw new Error('Failed to fetch room');
         }
-        const data = await response.json();
-        setRoom(data);
-      } catch {
-        setError('Failed to load room');
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
-
-    fetchRoom();
+      const data = await response.json();
+      setRoom(data);
+    } catch {
+      setError('Failed to load room');
+    } finally {
+      setIsLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchRoom();
+
+    // Refresh data when window gains focus (e.g., after deleting from my-rooms page)
+    const handleFocus = () => {
+      fetchRoom();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchRoom]);
+
+  // Delete a participant/booking (for hosts)
+  const handleDeleteParticipant = async (participantId: string) => {
+    if (!confirm('Are you sure you want to delete this booking?')) return;
+
+    try {
+      const res = await fetch(`/api/rooms/${id}/participants/${participantId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      // Refresh room data
+      await fetchRoom();
+    } catch {
+      alert('Failed to delete booking');
+    }
+  };
 
   const bookedSlots = useMemo(() => {
     if (!room || room.type !== 'booking') return new Set<string>();
@@ -178,6 +203,15 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
             </svg>
             {copied ? 'Copied!' : 'Copy link'}
+          </button>
+          <button
+            onClick={() => fetchRoom()}
+            className="inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            title="Refresh"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
           {/* Only show booking count to host */}
           {(!isBookingType || isHost) && (
@@ -393,17 +427,28 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                           </p>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                          {formattedTime}
-                        </p>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                          {date && new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                            {formattedTime}
+                          </p>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            {date && new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteParticipant(p.id)}
+                          className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                          title="Delete booking"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   );

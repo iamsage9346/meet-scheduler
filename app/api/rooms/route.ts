@@ -5,7 +5,7 @@ import { rooms } from '@/db/schema';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, type, dates, timeStart, timeEnd, hostSlots } = body;
+    const { title, type, dates, timeStart, timeEnd, hostSlots, hostName, hostEmail, meetLink } = body;
 
     if (!title || !dates?.length || timeStart === undefined || timeEnd === undefined) {
       return NextResponse.json(
@@ -24,6 +24,9 @@ export async function POST(request: Request) {
         timeStart,
         timeEnd,
         hostSlots: hostSlots || null,
+        hostName: hostName || null,
+        hostEmail: hostEmail || null,
+        meetLink: meetLink || null,
       })
       .returning();
 

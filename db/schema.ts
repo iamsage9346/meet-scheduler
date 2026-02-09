@@ -8,6 +8,9 @@ export const rooms = pgTable('rooms', {
   timeStart: integer('time_start').notNull(),
   timeEnd: integer('time_end').notNull(),
   hostSlots: jsonb('host_slots').$type<string[]>(), // For booking type: available slots set by host
+  hostName: text('host_name'), // Host's display name
+  hostEmail: text('host_email'), // Host's email for notifications
+  meetLink: text('meet_link'), // Google Meet or other video call link
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

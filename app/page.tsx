@@ -18,6 +18,12 @@ export default function Home() {
   const [timeStart, setTimeStart] = useState(9);
   const [timeEnd, setTimeEnd] = useState(17);
   const [hostSlots, setHostSlots] = useState<string[]>([]);
+
+  // Host info for booking type
+  const [hostName, setHostName] = useState('');
+  const [hostEmail, setHostEmail] = useState('');
+  const [meetLink, setMeetLink] = useState('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,6 +51,11 @@ export default function Home() {
       return;
     }
 
+    if (roomType === 'booking' && !hostName.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -58,6 +69,9 @@ export default function Home() {
           timeStart,
           timeEnd,
           hostSlots: roomType === 'booking' ? hostSlots : null,
+          hostName: roomType === 'booking' ? hostName.trim() : null,
+          hostEmail: roomType === 'booking' && hostEmail.trim() ? hostEmail.trim() : null,
+          meetLink: roomType === 'booking' && meetLink.trim() ? meetLink.trim() : null,
         }),
       });
 
@@ -150,6 +164,66 @@ export default function Home() {
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
         </div>
+
+        {/* Host Info (for booking type) */}
+        {roomType === 'booking' && (
+          <div className="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+            <h3 className="font-medium text-zinc-900 dark:text-zinc-100">Your Information</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="hostName"
+                  className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  Your name *
+                </label>
+                <input
+                  type="text"
+                  id="hostName"
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  placeholder="John Doe"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="hostEmail"
+                  className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  Your email (for notifications)
+                </label>
+                <input
+                  type="email"
+                  id="hostEmail"
+                  value={hostEmail}
+                  onChange={(e) => setHostEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="meetLink"
+                className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                Google Meet / Zoom link (optional)
+              </label>
+              <input
+                type="url"
+                id="meetLink"
+                value={meetLink}
+                onChange={(e) => setMeetLink(e.target.value)}
+                placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+              />
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                This link will be sent to guests when they book
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Date Selection */}
         <div>

@@ -8,6 +8,9 @@ export interface Room {
   timeStart: number;
   timeEnd: number;
   hostSlots: string[] | null;
+  hostName: string | null;
+  hostEmail: string | null;
+  meetLink: string | null;
   createdAt: Date;
 }
 
